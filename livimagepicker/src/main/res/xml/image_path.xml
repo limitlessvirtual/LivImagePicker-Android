@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <files-path name="captured_image" path="pick"/>
+    <files-path
+        name="captured_image"
+        path="pick" />
 </paths>

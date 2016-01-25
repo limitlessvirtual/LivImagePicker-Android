@@ -23,10 +23,11 @@ public class ExifUtil {
 
     /**
      * Rotates bitmap retrieved from Gallery content provider Api
+     *
      * @param context Application context
-     * @param uri Gallery content provider Uri of selected image
-     * @param cx Center X of image
-     * @param cy Center Y of image
+     * @param uri     Gallery content provider Uri of selected image
+     * @param cx      Center X of image
+     * @param cy      Center Y of image
      * @return Rotation matrix for correct Bitmap orientation
      */
     public static Matrix rotateBitmapFromGallery(Context context, Uri uri, float cx, float cy) {
@@ -40,8 +41,9 @@ public class ExifUtil {
 
     /**
      * Retrieve Exif from content provider
+     *
      * @param context Application context
-     * @param src Selected image Uri
+     * @param src     Selected image Uri
      * @return Orientation in degrees
      */
     private static int getExifOrientationFromGallery(Context context, Uri src) {
@@ -62,9 +64,10 @@ public class ExifUtil {
 
     /**
      * Rotate bitmap retrieved from File system
+     *
      * @param src Uri of selected image from file system
-     * @param cx Center X of image
-     * @param cy Center Y of image
+     * @param cx  Center X of image
+     * @param cy  Center Y of image
      * @return Rotation matrix for correct Bitmap orientation
      */
     public static Matrix rotateBitmapFromFile(String src, float cx, float cy) {
@@ -115,6 +118,7 @@ public class ExifUtil {
 
     /**
      * Retrieve Exif from file system
+     *
      * @param src Selected File Uri
      * @return Orientation code
      * @throws IOException

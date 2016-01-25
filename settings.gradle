@@ -1,1 +1,1 @@
-include ':app', ':livimagepicker'
+include ':app', ':liv-image-picker'

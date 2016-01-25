@@ -4,7 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/TestImage.iml" filepath="$PROJECT_DIR$/TestImage.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/livimagepicker/livimagepicker.iml" filepath="$PROJECT_DIR$/livimagepicker/livimagepicker.iml" />
+      <module fileurl="file://$PROJECT_DIR$/liv-image-picker/liv-image-picker.iml" filepath="$PROJECT_DIR$/liv-image-picker/liv-image-picker.iml" />
     </modules>
   </component>
 </project>

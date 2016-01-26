@@ -10,15 +10,27 @@
     tools:context="tech.livx.testimage.MainActivity">
 
     <ImageView
+        android:layout_centerHorizontal="true"
+        android:background="@android:color/black"
         android:id="@+id/demo"
+        android:scaleType="centerCrop"
         android:layout_width="300dp"
-        android:layout_height="300dp" />
+        android:layout_height="300dp"/>
 
     <Button
         android:id="@+id/image"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
         android:layout_centerHorizontal="true"
         android:text="Pick image" />
+    <Button
+        android:id="@+id/rotate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_centerHorizontal="true"
+        android:text="Rotate image" />
 </RelativeLayout>

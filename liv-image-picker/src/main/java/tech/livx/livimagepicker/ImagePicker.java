@@ -2,21 +2,22 @@ package tech.livx.livimagepicker;
 
 import android.app.Activity;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.MediaStore;
-import android.support.v4.content.FileProvider;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ import java.util.List;
  * ImagePicker class used to wrap Activity Events and provide boilerplate code for image picker
  *
  * @author Limitless Virtual
- * @version 0.1
+ * @version 0.1.2
  */
 
 public class ImagePicker {
@@ -45,8 +46,7 @@ public class ImagePicker {
     //Image properties
     private float width;
     private float height;
-    private boolean centerCrop = false;
-    private boolean isCamera = false;
+    private int rotation = 0;
 
     /**
      * Constructor
@@ -55,24 +55,13 @@ public class ImagePicker {
      * @param output     Output callback
      * @param width      Maximum width of the image
      * @param height     Maximum height of the image
-     * @param centerCrop true if image should be centerCropped to fit exactly
      */
-    public ImagePicker(Activity context, Output output, float width, float height, boolean centerCrop) {
-
-        //Create a temp.jpg file and use the FileProvider API to return a content Uri of where the image can be stored.
-        File path = new File(context.getFilesDir(), "pick");
-        if (!path.exists())
-            if (!path.mkdirs())
-                return;
-
-        File image = new File(path, "temp.jpg");
-        outputFileUri = FileProvider.getUriForFile(context, "tech.livx.livimagepicker.fileprovider", image);
+    public ImagePicker(Activity context, Output output, float width, float height) {
 
         //Member setters
         this.context = context;
         this.width = width;
         this.height = height;
-        this.centerCrop = centerCrop;
         this.output = output;
     }
 
@@ -85,11 +74,10 @@ public class ImagePicker {
 
         if (savedInstanceState != null) {
             outputFileUri = Uri.parse(savedInstanceState.getString("outputFileUri"));
-            isCamera = savedInstanceState.getBoolean("isCamera");
+            rotation = savedInstanceState.getInt("rotation");
 
             //Decode saved Uri to provide Activity with a fresh instance of the Bitmap (after destruction)
-            new DecodeUriAsync().execute(outputFileUri, width, height, centerCrop, isCamera, isCamera);
-            new DecodeUriAsync().execute(outputFileUri, width, height, centerCrop, isCamera, isCamera);
+            new DecodeUriAsync().execute(outputFileUri, width, height);
         }
     }
 
@@ -105,6 +93,7 @@ public class ImagePicker {
         if (requestCode == ACTIVITY_REQUEST) {
             if (resultCode == Activity.RESULT_OK) {
 
+                boolean isCamera;
                 //Check if a camera was used or gallery
                 if (data == null) {
                     isCamera = true;
@@ -118,7 +107,7 @@ public class ImagePicker {
 
                 //Attempt to decode the returned Uri in a background thread.
                 try {
-                    new DecodeUriAsync().execute(outputFileUri, width, height, centerCrop, isCamera);
+                    new DecodeUriAsync().execute(outputFileUri, width, height);
                 } catch (OutOfMemoryError e) {
                     e.printStackTrace();
                     output.onImageLoadFailed();
@@ -134,13 +123,18 @@ public class ImagePicker {
      */
     public void onSavedInstanceState(Bundle savedInstanceState) {
         savedInstanceState.putString("outputFileUri", outputFileUri.toString());
-        savedInstanceState.getBoolean("isCamera", isCamera);
+        savedInstanceState.putInt("rotation", rotation);
     }
 
     /**
      * Initiates pick image intents for camera and gallery apps.
      */
     public void pickImage() {
+        //reset variables
+        rotation = 0;
+
+        outputFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                new ContentValues());
         // Camera.
         final List<Intent> cameraIntents = new ArrayList<>();
         final Intent captureIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
@@ -184,8 +178,6 @@ public class ImagePicker {
                 Uri uri = (Uri) params[0];
                 float maxHeight = (float) params[1];
                 float maxWidth = (float) params[2];
-                boolean centerCrop = (boolean) params[3];
-                boolean isCamera = (boolean) params[4];
 
                 float maxSize = Math.max(maxHeight, maxWidth);
 
@@ -222,40 +214,47 @@ public class ImagePicker {
 
                 //Calculate further required scaling
                 float scale;
-                if (centerCrop) {
-                    if (width > height) {
-                        scale = maxHeight / height;
-                    } else {
-                        scale = maxWidth / width;
-                    }
+                if (width > height) {
+                    scale = maxHeight / height;
                 } else {
-                    if (width > height) {
-                        scale = maxWidth / width;
-                    } else {
-                        scale = maxHeight / height;
-                    }
+                    scale = maxWidth / width;
                 }
 
-                float left = (maxWidth - width) / 2;
-                float top = (maxHeight - height) / 2;
+                float left = ((maxWidth - (scale*width)) / 2);
+                float top = ((maxHeight - (scale*height)) / 2);
 
                 //Create final bitmap
-                Bitmap dest = Bitmap.createBitmap((int) maxWidth, (int) maxHeight, Bitmap.Config.ARGB_8888);
-                Canvas canvas = new Canvas(dest);
 
-                //Calculate any required rotations
-                Matrix matrix;
-                if (isCamera)
-                    matrix = ExifUtil.rotateBitmapFromFile(context.getFilesDir() + "/pick/temp.jpg", height / 2, width / 2);
-                else
-                    matrix = ExifUtil.rotateBitmapFromGallery(context, uri, width / 2, height / 2);
-                if (centerCrop)
-                    matrix.postTranslate(left, top);
+                Matrix matrix = new Matrix();
 
                 //Apply scaling calculation
-                matrix.postScale(scale, scale);
+
+                matrix.setTranslate(-(width / 2), -(height / 2));
+
+                //Calculate any required rotations
+                float tempRotation = rotation + ExifUtil.getExifOrientationFromGallery(context, uri);
+
+                matrix.postRotate(tempRotation);
+
+                Bitmap dest;
+                if((tempRotation/ 90) % 2 != 0) {
+                    dest = Bitmap.createBitmap((int) maxHeight, (int) maxWidth, Bitmap.Config.ARGB_8888);
+                    matrix.postTranslate(height/2, width/2);
+                    matrix.postScale(scale, scale);
+                    matrix.postTranslate(top,left);
+                } else {
+                    dest = Bitmap.createBitmap((int) maxWidth, (int) maxHeight, Bitmap.Config.ARGB_8888);
+                    matrix.postTranslate(width/2, height/2);
+                    matrix.postScale(scale, scale);
+                    matrix.postTranslate(left, top);
+                }
+
+                Canvas canvas = new Canvas(dest);
 
                 //Draw final bitmap
+                canvas.drawARGB(255, 255, 0, 0);
+                Paint circle = new Paint();
+                circle.setColor(Color.argb(255, 255, 0, 0));
                 canvas.drawBitmap(finalBitmap, matrix, null);
                 finalBitmap.recycle();
                 return dest;
@@ -268,6 +267,16 @@ public class ImagePicker {
         @Override
         protected void onPostExecute(Bitmap bitmap) {
             output.process(bitmap);
+        }
+    }
+
+    /**
+     * Rotates image incrementally
+     */
+    public void rotateImage() {
+        if(outputFileUri != null) {
+            rotation+= 90;
+            new DecodeUriAsync().execute(outputFileUri, width, height);
         }
     }
 }

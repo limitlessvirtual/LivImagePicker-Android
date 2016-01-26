@@ -12,7 +12,6 @@ import tech.livx.livimagepicker.OutputBitmap;
 
 public class MainActivity extends AppCompatActivity {
     private ImagePicker imagePicker;
-    private View button;
     private ImageView demo;
 
     @Override
@@ -32,12 +31,21 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                 },
-                600, 600, false);
+                600, 500);
 
         demo = (ImageView) findViewById(R.id.demo);
 
         imagePicker.onCreate(savedInstanceState);
-        button = findViewById(R.id.image);
+
+        View rotate = findViewById(R.id.rotate);
+        rotate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                imagePicker.rotateImage();
+            }
+        });
+
+        View button = findViewById(R.id.image);
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

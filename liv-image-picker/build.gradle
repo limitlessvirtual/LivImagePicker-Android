@@ -13,7 +13,7 @@ ext {
     siteUrl = 'https://github.com/limitlessvirtual/LivImagePicker-Android'
     gitUrl = 'https://github.com/limitlessvirtual/LivImagePicker-Android.git'
 
-    libraryVersion = '0.1.1'
+    libraryVersion = '0.1.2'
 
     developerId = 'mitchdart'
     developerName = 'Mitch Dart'
@@ -31,8 +31,8 @@ android {
     defaultConfig {
         minSdkVersion 14
         targetSdkVersion 23
-        versionCode 2
-        versionName "0.1.1"
+        versionCode 3
+        versionName "0.1.2"
     }
     buildTypes {
         release {
@@ -40,10 +40,6 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-}
-
-dependencies {
-    compile 'com.android.support:support-v4:+'
 }
 
 apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'

@@ -9,9 +9,7 @@ import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Matrix;
-import android.graphics.Paint;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -47,14 +45,15 @@ public class ImagePicker {
     private float width;
     private float height;
     private int rotation = 0;
+    private boolean isCamera;
 
     /**
      * Constructor
      *
-     * @param context    Activity reference
-     * @param output     Output callback
-     * @param width      Maximum width of the image
-     * @param height     Maximum height of the image
+     * @param context Activity reference
+     * @param output  Output callback
+     * @param width   Maximum width of the image
+     * @param height  Maximum height of the image
      */
     public ImagePicker(Activity context, Output output, float width, float height) {
 
@@ -75,9 +74,10 @@ public class ImagePicker {
         if (savedInstanceState != null) {
             outputFileUri = Uri.parse(savedInstanceState.getString("outputFileUri"));
             rotation = savedInstanceState.getInt("rotation");
+            isCamera = savedInstanceState.getBoolean("isCamera");
 
             //Decode saved Uri to provide Activity with a fresh instance of the Bitmap (after destruction)
-            new DecodeUriAsync().execute(outputFileUri, width, height);
+            new DecodeUriAsync().execute(outputFileUri, width, height, isCamera);
         }
     }
 
@@ -93,11 +93,11 @@ public class ImagePicker {
         if (requestCode == ACTIVITY_REQUEST) {
             if (resultCode == Activity.RESULT_OK) {
 
-                boolean isCamera;
-                //Check if a camera was used or gallery
                 if (data == null) {
+                    //Some camera apps give null data
                     isCamera = true;
                 } else {
+                    //Others give data containing the ACTION_IMAGE_CAPTURE
                     final String action = data.getAction();
                     isCamera = action != null && action.equals(MediaStore.ACTION_IMAGE_CAPTURE);
                 }
@@ -107,7 +107,7 @@ public class ImagePicker {
 
                 //Attempt to decode the returned Uri in a background thread.
                 try {
-                    new DecodeUriAsync().execute(outputFileUri, width, height);
+                    new DecodeUriAsync().execute(outputFileUri, width, height, isCamera);
                 } catch (OutOfMemoryError e) {
                     e.printStackTrace();
                     output.onImageLoadFailed();
@@ -124,6 +124,7 @@ public class ImagePicker {
     public void onSavedInstanceState(Bundle savedInstanceState) {
         savedInstanceState.putString("outputFileUri", outputFileUri.toString());
         savedInstanceState.putInt("rotation", rotation);
+        savedInstanceState.putBoolean("isCamera", isCamera);
     }
 
     /**
@@ -133,22 +134,26 @@ public class ImagePicker {
         //reset variables
         rotation = 0;
 
-        outputFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                new ContentValues());
-        // Camera.
+        //Insert a URI into the gallery for our new captured image and hold onto it
+        outputFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
+
+        //List of camera intents
         final List<Intent> cameraIntents = new ArrayList<>();
+
+        // Capture intent
         final Intent captureIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+
+        //Query package manager for all activities that filter ACTION_IMAGE_CAPTURE intents
         final PackageManager packageManager = context.getPackageManager();
         final List<ResolveInfo> listCam = packageManager.queryIntentActivities(captureIntent, 0);
+
+        //Loop through all available activities, create intents for them and add them to our cameraIntents list
         for (ResolveInfo res : listCam) {
             final String packageName = res.activityInfo.packageName;
             final Intent intent = new Intent(captureIntent);
             intent.setComponent(new ComponentName(res.activityInfo.packageName, res.activityInfo.name));
             intent.setPackage(packageName);
             intent.putExtra(MediaStore.EXTRA_OUTPUT, outputFileUri);
-
-            //Grant app permissions
-            context.grantUriPermission(packageName, outputFileUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             cameraIntents.add(intent);
         }
 
@@ -163,6 +168,7 @@ public class ImagePicker {
         // Add the camera options.
         chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, cameraIntents.toArray(new Parcelable[cameraIntents.size()]));
 
+        //Finally launch the intent chooser
         context.startActivityForResult(chooserIntent, ACTIVITY_REQUEST);
     }
 
@@ -178,6 +184,7 @@ public class ImagePicker {
                 Uri uri = (Uri) params[0];
                 float maxHeight = (float) params[1];
                 float maxWidth = (float) params[2];
+                boolean isCamera = (boolean) params[3];
 
                 float maxSize = Math.max(maxHeight, maxWidth);
 
@@ -193,8 +200,9 @@ public class ImagePicker {
                 float height = preLoadOptions.outHeight;
                 float width = preLoadOptions.outWidth;
 
-                //Calculate scale factor to improve memory by sampling image as close to required size as possible
+                //Start off with a 1:1 ratio (Full size)
                 int scaleFactor = 1;
+
                 while (true) {
                     if (width / 2 < maxSize || height / 2 < maxSize)
                         break;
@@ -220,8 +228,8 @@ public class ImagePicker {
                     scale = maxWidth / width;
                 }
 
-                float left = ((maxWidth - (scale*width)) / 2);
-                float top = ((maxHeight - (scale*height)) / 2);
+                float left = ((maxWidth - (scale * width)) / 2);
+                float top = ((maxHeight - (scale * height)) / 2);
 
                 //Create final bitmap
 
@@ -232,19 +240,24 @@ public class ImagePicker {
                 matrix.setTranslate(-(width / 2), -(height / 2));
 
                 //Calculate any required rotations
-                float tempRotation = rotation + ExifUtil.getExifOrientationFromGallery(context, uri);
+                float tempRotation;
+                if (isCamera) {
+                    tempRotation = rotation + ExifUtil.getExifOrientationFromCamera(context, uri);
+                } else {
+                    tempRotation = rotation + ExifUtil.getExifOrientationFromGallery(context, uri);
+                }
 
                 matrix.postRotate(tempRotation);
 
                 Bitmap dest;
-                if((tempRotation/ 90) % 2 != 0) {
+                if ((tempRotation / 90) % 2 != 0) {
                     dest = Bitmap.createBitmap((int) maxHeight, (int) maxWidth, Bitmap.Config.ARGB_8888);
-                    matrix.postTranslate(height/2, width/2);
+                    matrix.postTranslate(height / 2, width / 2);
                     matrix.postScale(scale, scale);
-                    matrix.postTranslate(top,left);
+                    matrix.postTranslate(top, left);
                 } else {
                     dest = Bitmap.createBitmap((int) maxWidth, (int) maxHeight, Bitmap.Config.ARGB_8888);
-                    matrix.postTranslate(width/2, height/2);
+                    matrix.postTranslate(width / 2, height / 2);
                     matrix.postScale(scale, scale);
                     matrix.postTranslate(left, top);
                 }
@@ -252,9 +265,6 @@ public class ImagePicker {
                 Canvas canvas = new Canvas(dest);
 
                 //Draw final bitmap
-                canvas.drawARGB(255, 255, 0, 0);
-                Paint circle = new Paint();
-                circle.setColor(Color.argb(255, 255, 0, 0));
                 canvas.drawBitmap(finalBitmap, matrix, null);
                 finalBitmap.recycle();
                 return dest;
@@ -274,9 +284,9 @@ public class ImagePicker {
      * Rotates image incrementally
      */
     public void rotateImage() {
-        if(outputFileUri != null) {
-            rotation+= 90;
-            new DecodeUriAsync().execute(outputFileUri, width, height);
+        if (outputFileUri != null) {
+            rotation += 90;
+            new DecodeUriAsync().execute(outputFileUri, width, height, isCamera);
         }
     }
 }

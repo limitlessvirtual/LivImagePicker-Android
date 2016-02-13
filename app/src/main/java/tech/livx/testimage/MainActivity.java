@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                 },
-                600, 500);
+                600, 500, true);
 
         demo = (ImageView) findViewById(R.id.demo);
 

@@ -15,6 +15,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.MediaStore;
+import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,6 +47,7 @@ public class ImagePicker {
     private float height;
     private int rotation = 0;
     private boolean isCamera;
+    private boolean exact;
 
     /**
      * Constructor
@@ -54,14 +56,16 @@ public class ImagePicker {
      * @param output  Output callback
      * @param width   Maximum width of the image
      * @param height  Maximum height of the image
+     * @param exact   Flag to specify if the image must be exactly the width and height, if false then it will be at most the height and width but not exactly.
      */
-    public ImagePicker(Activity context, Output output, float width, float height) {
+    public ImagePicker(Activity context, Output output, float width, float height, boolean exact) {
 
         //Member setters
         this.context = context;
         this.width = width;
         this.height = height;
         this.output = output;
+        this.exact = exact;
     }
 
     /**
@@ -72,7 +76,10 @@ public class ImagePicker {
     public void onCreate(Bundle savedInstanceState) {
 
         if (savedInstanceState != null) {
-            outputFileUri = Uri.parse(savedInstanceState.getString("outputFileUri"));
+            if(savedInstanceState.getString("outputFileUri") == null)
+                outputFileUri = null;
+            else
+                outputFileUri = Uri.parse(savedInstanceState.getString("outputFileUri"));
             rotation = savedInstanceState.getInt("rotation");
             isCamera = savedInstanceState.getBoolean("isCamera");
 
@@ -122,7 +129,10 @@ public class ImagePicker {
      * @param savedInstanceState Activity savedInstanceState bundle
      */
     public void onSavedInstanceState(Bundle savedInstanceState) {
-        savedInstanceState.putString("outputFileUri", outputFileUri.toString());
+        if(outputFileUri == null)
+            savedInstanceState.putString("outputFileUri", null);
+        else
+            savedInstanceState.putString("outputFileUri", outputFileUri.toString());
         savedInstanceState.putInt("rotation", rotation);
         savedInstanceState.putBoolean("isCamera", isCamera);
     }
@@ -211,6 +221,23 @@ public class ImagePicker {
                     scaleFactor *= 2;
                 }
 
+                //Calculate further required scaling
+                float scale = 1.0f;
+                if(exact) {
+                    if (width > height) {
+                        scale = maxHeight / height;
+                    } else {
+                        scale = maxWidth / width;
+                    }
+                } else {
+                    //Not exact so scale by one more factor to ensure in max bounds.
+                    if(width > maxWidth || height > maxHeight) {
+                        width /= 2;
+                        height /= 2;
+                        scaleFactor *= 2;
+                    }
+                }
+
                 BitmapFactory.Options postLoadOptions = new BitmapFactory.Options();
                 postLoadOptions.inSampleSize = scaleFactor;
 
@@ -220,23 +247,20 @@ public class ImagePicker {
                 if (input != null)
                     input.close();
 
-                //Calculate further required scaling
-                float scale;
-                if (width > height) {
-                    scale = maxHeight / height;
-                } else {
-                    scale = maxWidth / width;
+                if()
+
+                if(!exact) {
+                    maxHeight = height;
+                    maxWidth = width;
                 }
 
                 float left = ((maxWidth - (scale * width)) / 2);
                 float top = ((maxHeight - (scale * height)) / 2);
 
                 //Create final bitmap
-
                 Matrix matrix = new Matrix();
 
                 //Apply scaling calculation
-
                 matrix.setTranslate(-(width / 2), -(height / 2));
 
                 //Calculate any required rotations

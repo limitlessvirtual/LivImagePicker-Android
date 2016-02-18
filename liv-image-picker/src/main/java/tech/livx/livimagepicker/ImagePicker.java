@@ -15,7 +15,6 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.MediaStore;
-import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,6 +29,10 @@ import java.util.List;
  */
 
 public class ImagePicker {
+    public static final int IMAGE_PICK_TYPE_CAMERA_ONLY = 0;
+    public static final int IMAGE_PICK_TYPE_GALLERY_ONLY = 1;
+    public static final int IMAGE_PICK_TYPE_CAMERA_AND_GALLERY = 2;
+
     //Random activity request code
     private static final int ACTIVITY_REQUEST = 53642;
 
@@ -139,47 +142,81 @@ public class ImagePicker {
 
     /**
      * Initiates pick image intents for camera and gallery apps.
+     *
+     * @param imagePickType Type of pick eg IMAGE_PICK_TYPE_CAMERA_ONLY
      */
-    public void pickImage() {
+    public void pickImage(int imagePickType) {
         //reset variables
         rotation = 0;
 
         //Insert a URI into the gallery for our new captured image and hold onto it
         outputFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
 
+        switch (imagePickType) {
+            case IMAGE_PICK_TYPE_CAMERA_AND_GALLERY : {
+                context.startActivityForResult(createGalleryAndCameraIntent(outputFileUri), ACTIVITY_REQUEST);
+                break;
+            }
+            case IMAGE_PICK_TYPE_CAMERA_ONLY : {
+                context.startActivityForResult(createCameraIntent(outputFileUri), ACTIVITY_REQUEST);
+                break;
+            }
+            case IMAGE_PICK_TYPE_GALLERY_ONLY : {
+                context.startActivityForResult(createGalleryIntent(), ACTIVITY_REQUEST);
+                break;
+            }
+        }
+    }
+
+    private Intent createGalleryAndCameraIntent(Uri cameraOutputUri) {
+
         //List of camera intents
         final List<Intent> cameraIntents = new ArrayList<>();
 
         // Capture intent
-        final Intent captureIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+        Intent captureIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
 
         //Query package manager for all activities that filter ACTION_IMAGE_CAPTURE intents
-        final PackageManager packageManager = context.getPackageManager();
-        final List<ResolveInfo> listCam = packageManager.queryIntentActivities(captureIntent, 0);
+        PackageManager packageManager = context.getPackageManager();
+        List<ResolveInfo> listCam = packageManager.queryIntentActivities(captureIntent, 0);
 
         //Loop through all available activities, create intents for them and add them to our cameraIntents list
         for (ResolveInfo res : listCam) {
-            final String packageName = res.activityInfo.packageName;
-            final Intent intent = new Intent(captureIntent);
+            String packageName = res.activityInfo.packageName;
+            Intent intent = new Intent(captureIntent);
             intent.setComponent(new ComponentName(res.activityInfo.packageName, res.activityInfo.name));
             intent.setPackage(packageName);
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, outputFileUri);
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutputUri);
             cameraIntents.add(intent);
         }
 
         // Filesystem.
-        final Intent galleryIntent = new Intent();
+        Intent galleryIntent = new Intent();
         galleryIntent.setType("image/*");
         galleryIntent.setAction(Intent.ACTION_PICK);
 
         // Chooser of filesystem options.
-        final Intent chooserIntent = Intent.createChooser(galleryIntent, "Choose image");
+        Intent chooserIntent = Intent.createChooser(galleryIntent, "Choose image");
 
         // Add the camera options.
         chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, cameraIntents.toArray(new Parcelable[cameraIntents.size()]));
 
-        //Finally launch the intent chooser
-        context.startActivityForResult(chooserIntent, ACTIVITY_REQUEST);
+        return chooserIntent;
+    }
+
+    private Intent createGalleryIntent() {
+        Intent intent = new Intent();
+        intent.setType("image/*");
+        intent.setAction(Intent.ACTION_PICK);
+
+        return intent;
+    }
+
+    private Intent createCameraIntent(Uri cameraOutputUri) {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutputUri);
+
+        return intent;
     }
 
     /**
@@ -246,8 +283,6 @@ public class ImagePicker {
                 Bitmap finalBitmap = BitmapFactory.decodeStream(input, null, postLoadOptions);
                 if (input != null)
                     input.close();
-
-                if()
 
                 if(!exact) {
                     maxHeight = height;

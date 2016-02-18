@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                imagePicker.pickImage();
+                imagePicker.pickImage(ImagePicker.IMAGE_PICK_TYPE_CAMERA_ONLY);
             }
         });
     }

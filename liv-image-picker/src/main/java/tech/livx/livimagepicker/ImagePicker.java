@@ -87,7 +87,8 @@ public class ImagePicker {
             isCamera = savedInstanceState.getBoolean("isCamera");
 
             //Decode saved Uri to provide Activity with a fresh instance of the Bitmap (after destruction)
-            new DecodeUriAsync().execute(outputFileUri, width, height, isCamera);
+            if(outputFileUri != null)
+                new DecodeUriAsync().execute(outputFileUri, width, height, isCamera);
         }
     }
 
@@ -151,6 +152,9 @@ public class ImagePicker {
 
         //Insert a URI into the gallery for our new captured image and hold onto it
         outputFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
+
+        if(outputFileUri == null)
+            return;
 
         switch (imagePickType) {
             case IMAGE_PICK_TYPE_CAMERA_AND_GALLERY : {
@@ -307,6 +311,10 @@ public class ImagePicker {
                 }
 
                 matrix.postRotate(tempRotation);
+
+                //Crashes sometimes by settings width and height to 0
+                if(maxWidth == 0 || maxHeight == 0)
+                    return null;
 
                 Bitmap dest;
                 if ((tempRotation / 90) % 2 != 0) {

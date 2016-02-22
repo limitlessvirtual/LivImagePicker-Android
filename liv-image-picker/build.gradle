@@ -13,7 +13,7 @@ ext {
     siteUrl = 'https://github.com/limitlessvirtual/LivImagePicker-Android'
     gitUrl = 'https://github.com/limitlessvirtual/LivImagePicker-Android.git'
 
-    libraryVersion = '0.3.3'
+    libraryVersion = '0.3.4'
 
     developerId = 'mitchdart'
     developerName = 'Mitch Dart'
@@ -31,8 +31,8 @@ android {
     defaultConfig {
         minSdkVersion 14
         targetSdkVersion 23
-        versionCode 9
-        versionName "0.3.3"
+        versionCode 10
+        versionName "0.3.4"
     }
     buildTypes {
         release {

@@ -10,13 +10,14 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.MediaStore;
+import android.util.Log;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +39,7 @@ public class ImagePicker {
 
     //Output uri of selected image
     private android.net.Uri outputFileUri;
+    private android.net.Uri newFileUri;
 
     //Wrapped activity
     private Activity context;
@@ -51,6 +53,11 @@ public class ImagePicker {
     private int rotation = 0;
     private boolean isCamera;
     private boolean exact;
+    private final Object lock = new Object();
+    private static boolean isRunning = false;
+
+    //Thread instance
+    private DecodeUriAsync decodeUriAsync;
 
     /**
      * Constructor
@@ -87,8 +94,10 @@ public class ImagePicker {
             isCamera = savedInstanceState.getBoolean("isCamera");
 
             //Decode saved Uri to provide Activity with a fresh instance of the Bitmap (after destruction)
-            if(outputFileUri != null)
-                new DecodeUriAsync().execute(outputFileUri, width, height, isCamera);
+            if(outputFileUri != null && !isRunning) {
+                decodeUriAsync = new DecodeUriAsync();
+                decodeUriAsync.execute(outputFileUri, width, height, isCamera);
+            }
         }
     }
 
@@ -115,10 +124,15 @@ public class ImagePicker {
 
                 if (!isCamera)
                     outputFileUri = data.getData();
+                else
+                    outputFileUri = newFileUri;
 
                 //Attempt to decode the returned Uri in a background thread.
                 try {
-                    new DecodeUriAsync().execute(outputFileUri, width, height, isCamera);
+                    if(!isRunning && outputFileUri != null) {
+                        decodeUriAsync = new DecodeUriAsync();
+                        decodeUriAsync.execute(outputFileUri, width, height, isCamera);
+                    }
                 } catch (OutOfMemoryError e) {
                     e.printStackTrace();
                     output.onImageLoadFailed();
@@ -151,18 +165,19 @@ public class ImagePicker {
         rotation = 0;
 
         //Insert a URI into the gallery for our new captured image and hold onto it
-        outputFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
+        newFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
 
-        if(outputFileUri == null)
+        //Ensure that uri was able to be created
+        if(newFileUri == null)
             return;
 
         switch (imagePickType) {
             case IMAGE_PICK_TYPE_CAMERA_AND_GALLERY : {
-                context.startActivityForResult(createGalleryAndCameraIntent(outputFileUri), ACTIVITY_REQUEST);
+                context.startActivityForResult(createGalleryAndCameraIntent(newFileUri), ACTIVITY_REQUEST);
                 break;
             }
             case IMAGE_PICK_TYPE_CAMERA_ONLY : {
-                context.startActivityForResult(createCameraIntent(outputFileUri), ACTIVITY_REQUEST);
+                context.startActivityForResult(createCameraIntent(newFileUri), ACTIVITY_REQUEST);
                 break;
             }
             case IMAGE_PICK_TYPE_GALLERY_ONLY : {
@@ -230,112 +245,116 @@ public class ImagePicker {
         @Override
         protected Bitmap doInBackground(Object... params) {
             try {
+                synchronized (lock) {
+                    isRunning = true;
 
-                //Retrieve parameters
-                Uri uri = (Uri) params[0];
-                float maxHeight = (float) params[1];
-                float maxWidth = (float) params[2];
-                boolean isCamera = (boolean) params[3];
+                    //Retrieve parameters
+                    Uri uri = (Uri) params[0];
+                    Log.i("URI", uri.toString());
+                    float maxHeight = (float) params[1];
+                    float maxWidth = (float) params[2];
+                    boolean isCamera = (boolean) params[3];
 
-                float maxSize = Math.max(maxHeight, maxWidth);
+                    float maxSize = Math.max(maxHeight, maxWidth);
 
-                //Load actual bounds of image
-                BitmapFactory.Options preLoadOptions = new BitmapFactory.Options();
-                preLoadOptions.inJustDecodeBounds = true;
+                    //Load actual bounds of image
+                    BitmapFactory.Options preLoadOptions = new BitmapFactory.Options();
+                    preLoadOptions.inJustDecodeBounds = true;
 
-                InputStream input = context.getContentResolver().openInputStream(uri);
-                BitmapFactory.decodeStream(input, null, preLoadOptions);
-                if (input != null)
-                    input.close();
+                    InputStream input = context.getContentResolver().openInputStream(uri);
+                    BitmapFactory.decodeStream(input, null, preLoadOptions);
+                    if (input != null)
+                        input.close();
 
-                float height = preLoadOptions.outHeight;
-                float width = preLoadOptions.outWidth;
+                    float height = preLoadOptions.outHeight;
+                    float width = preLoadOptions.outWidth;
 
-                //Start off with a 1:1 ratio (Full size)
-                int scaleFactor = 1;
+                    //Start off with a 1:1 ratio (Full size)
+                    int scaleFactor = 1;
 
-                while (true) {
-                    if (width / 2 < maxSize || height / 2 < maxSize)
-                        break;
-                    width /= 2;
-                    height /= 2;
-                    scaleFactor *= 2;
-                }
-
-                //Calculate further required scaling
-                float scale = 1.0f;
-                if(exact) {
-                    if (width > height) {
-                        scale = maxHeight / height;
-                    } else {
-                        scale = maxWidth / width;
-                    }
-                } else {
-                    //Not exact so scale by one more factor to ensure in max bounds.
-                    if(width > maxWidth || height > maxHeight) {
+                    while (true) {
+                        if (width / 2 < maxSize || height / 2 < maxSize)
+                            break;
                         width /= 2;
                         height /= 2;
                         scaleFactor *= 2;
                     }
+
+                    //Calculate further required scaling
+                    float scale = 1.0f;
+                    if (exact) {
+                        if (width > height) {
+                            scale = maxHeight / height;
+                        } else {
+                            scale = maxWidth / width;
+                        }
+                    } else {
+                        //Not exact so scale by one more factor to ensure in max bounds.
+                        if (width > maxWidth || height > maxHeight) {
+                            width /= 2;
+                            height /= 2;
+                            scaleFactor *= 2;
+                        }
+                    }
+
+                    BitmapFactory.Options postLoadOptions = new BitmapFactory.Options();
+                    postLoadOptions.inSampleSize = scaleFactor;
+
+                    //Load image with calculated scale factor
+                    input = context.getContentResolver().openInputStream(uri);
+                    Bitmap finalBitmap = BitmapFactory.decodeStream(input, null, postLoadOptions);
+                    if (input != null)
+                        input.close();
+
+                    if (!exact) {
+                        maxHeight = height;
+                        maxWidth = width;
+                    }
+
+                    float left = ((maxWidth - (scale * width)) / 2);
+                    float top = ((maxHeight - (scale * height)) / 2);
+
+                    //Create final bitmap
+                    Matrix matrix = new Matrix();
+
+                    //Apply scaling calculation
+                    matrix.setTranslate(-(width / 2), -(height / 2));
+
+                    //Calculate any required rotations
+                    float tempRotation;
+                    if (isCamera) {
+                        tempRotation = rotation + ExifUtil.getExifOrientationFromCamera(context, uri);
+                    } else {
+                        tempRotation = rotation + ExifUtil.getExifOrientationFromGallery(context, uri);
+                    }
+
+                    matrix.postRotate(tempRotation);
+
+                    //Crashes sometimes by settings width and height to 0
+                    if (maxWidth == 0 || maxHeight == 0)
+                        return null;
+
+                    Bitmap dest;
+                    if ((tempRotation / 90) % 2 != 0) {
+                        dest = Bitmap.createBitmap((int) maxHeight, (int) maxWidth, Bitmap.Config.ARGB_8888);
+                        matrix.postTranslate(height / 2, width / 2);
+                        matrix.postScale(scale, scale);
+                        matrix.postTranslate(top, left);
+                    } else {
+                        dest = Bitmap.createBitmap((int) maxWidth, (int) maxHeight, Bitmap.Config.ARGB_8888);
+                        matrix.postTranslate(width / 2, height / 2);
+                        matrix.postScale(scale, scale);
+                        matrix.postTranslate(left, top);
+                    }
+
+                    Canvas canvas = new Canvas(dest);
+
+                    //Draw final bitmap
+                    canvas.drawBitmap(finalBitmap, matrix, new Paint());
+                    finalBitmap.recycle();
+                    return dest;
                 }
-
-                BitmapFactory.Options postLoadOptions = new BitmapFactory.Options();
-                postLoadOptions.inSampleSize = scaleFactor;
-
-                //Load image with calculated scale factor
-                input = context.getContentResolver().openInputStream(uri);
-                Bitmap finalBitmap = BitmapFactory.decodeStream(input, null, postLoadOptions);
-                if (input != null)
-                    input.close();
-
-                if(!exact) {
-                    maxHeight = height;
-                    maxWidth = width;
-                }
-
-                float left = ((maxWidth - (scale * width)) / 2);
-                float top = ((maxHeight - (scale * height)) / 2);
-
-                //Create final bitmap
-                Matrix matrix = new Matrix();
-
-                //Apply scaling calculation
-                matrix.setTranslate(-(width / 2), -(height / 2));
-
-                //Calculate any required rotations
-                float tempRotation;
-                if (isCamera) {
-                    tempRotation = rotation + ExifUtil.getExifOrientationFromCamera(context, uri);
-                } else {
-                    tempRotation = rotation + ExifUtil.getExifOrientationFromGallery(context, uri);
-                }
-
-                matrix.postRotate(tempRotation);
-
-                //Crashes sometimes by settings width and height to 0
-                if(maxWidth == 0 || maxHeight == 0)
-                    return null;
-
-                Bitmap dest;
-                if ((tempRotation / 90) % 2 != 0) {
-                    dest = Bitmap.createBitmap((int) maxHeight, (int) maxWidth, Bitmap.Config.ARGB_8888);
-                    matrix.postTranslate(height / 2, width / 2);
-                    matrix.postScale(scale, scale);
-                    matrix.postTranslate(top, left);
-                } else {
-                    dest = Bitmap.createBitmap((int) maxWidth, (int) maxHeight, Bitmap.Config.ARGB_8888);
-                    matrix.postTranslate(width / 2, height / 2);
-                    matrix.postScale(scale, scale);
-                    matrix.postTranslate(left, top);
-                }
-
-                Canvas canvas = new Canvas(dest);
-
-                //Draw final bitmap
-                canvas.drawBitmap(finalBitmap, matrix, null);
-                finalBitmap.recycle();
-                return dest;
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
                 return null;
             }
@@ -343,7 +362,11 @@ public class ImagePicker {
 
         @Override
         protected void onPostExecute(Bitmap bitmap) {
-            output.process(bitmap);
+            isRunning = false;
+            if(bitmap != null)
+                output.process(bitmap);
+            else
+                output.onImageLoadFailed();
         }
     }
 
@@ -351,9 +374,14 @@ public class ImagePicker {
      * Rotates image incrementally
      */
     public void rotateImage() {
+
         if (outputFileUri != null) {
             rotation += 90;
-            new DecodeUriAsync().execute(outputFileUri, width, height, isCamera);
+            if(!isRunning) {
+                decodeUriAsync = new DecodeUriAsync();
+                Log.i("URI", String.format("Trying rotation with %s", outputFileUri.toString()));
+                decodeUriAsync.execute(outputFileUri, width, height, isCamera);
+            }
         }
     }
 }

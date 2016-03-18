@@ -2,8 +2,10 @@ package tech.livx.testimage;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 
@@ -14,6 +16,8 @@ public class MainActivity extends AppCompatActivity {
     private ImagePicker imagePicker;
     private ImageView demo;
 
+    private Bitmap bitmap;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -22,16 +26,18 @@ public class MainActivity extends AppCompatActivity {
         imagePicker = new ImagePicker(this,
                 new OutputBitmap() {
                     @Override
-                    public void onImageLoaded(Bitmap image) {
-                        demo.setImageBitmap(image);
+                    public void onImageLoaded(Uri uri, Bitmap image) {
+                        bitmap = image;
+
+                        demo.setImageURI(uri);
                     }
 
                     @Override
                     public void onImageLoadFailed() {
-
+                        Log.i("TEST","FAILED");
                     }
                 },
-                600, 500, true);
+                300, 300, false);
 
         demo = (ImageView) findViewById(R.id.demo);
 

@@ -1,6 +1,7 @@
 package tech.livx.livimagepicker;
 
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.util.Base64;
 
@@ -11,7 +12,7 @@ import java.io.ByteArrayOutputStream;
  */
 public abstract class OutputBase64 implements Output<String> {
     @Override
-    public void process(Bitmap bitmap) {
+    public void process(final Uri uri,Bitmap bitmap) {
         new AsyncTask<Bitmap, Void, String>() {
             @Override
             protected String doInBackground(Bitmap... params) {
@@ -28,7 +29,7 @@ public abstract class OutputBase64 implements Output<String> {
             @Override
             protected void onPostExecute(String s) {
                 super.onPostExecute(s);
-                onImageLoaded(s);
+                onImageLoaded(uri,s);
             }
         }.execute(bitmap);
     }

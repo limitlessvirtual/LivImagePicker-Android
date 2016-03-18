@@ -1,6 +1,7 @@
 package tech.livx.livimagepicker;
 
 import android.graphics.Bitmap;
+import android.net.Uri;
 
 /**
  * Output interface for variable Output callbacks
@@ -8,9 +9,9 @@ import android.graphics.Bitmap;
  * @param <T> Output Type
  */
 public interface Output<T> {
-    void onImageLoaded(T image);
+    void onImageLoaded(Uri uri,T image);
 
     void onImageLoadFailed();
 
-    void process(Bitmap bitmap);
+    void process(Uri uri,Bitmap bitmap);
 }

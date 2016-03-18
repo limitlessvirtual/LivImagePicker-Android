@@ -90,6 +90,12 @@ public class ImagePicker {
                 outputFileUri = null;
             else
                 outputFileUri = Uri.parse(savedInstanceState.getString("outputFileUri"));
+
+            if(savedInstanceState.getString("newFileUri") == null)
+                newFileUri = null;
+            else
+                newFileUri = Uri.parse(savedInstanceState.getString("newFileUri"));
+
             rotation = savedInstanceState.getInt("rotation");
             isCamera = savedInstanceState.getBoolean("isCamera");
 
@@ -151,6 +157,11 @@ public class ImagePicker {
             savedInstanceState.putString("outputFileUri", null);
         else
             savedInstanceState.putString("outputFileUri", outputFileUri.toString());
+
+        if(newFileUri == null)
+            savedInstanceState.putString("newFileUri", null);
+        else
+            savedInstanceState.putString("newFileUri", newFileUri.toString());
         savedInstanceState.putInt("rotation", rotation);
         savedInstanceState.putBoolean("isCamera", isCamera);
     }
@@ -165,7 +176,10 @@ public class ImagePicker {
         rotation = 0;
 
         //Insert a URI into the gallery for our new captured image and hold onto it
-        newFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
+        ContentValues values = new ContentValues();
+
+        if(newFileUri == null)
+            newFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
 
         //Ensure that uri was able to be created
         if(newFileUri == null)
@@ -273,7 +287,7 @@ public class ImagePicker {
                     int scaleFactor = 1;
 
                     while (true) {
-                        if (width / 2 < maxSize || height / 2 < maxSize)
+                        if (width / 2 < maxSize && height / 2 < maxSize)
                             break;
                         width /= 2;
                         height /= 2;
@@ -364,7 +378,7 @@ public class ImagePicker {
         protected void onPostExecute(Bitmap bitmap) {
             isRunning = false;
             if(bitmap != null)
-                output.process(bitmap);
+                output.process(outputFileUri,bitmap);
             else
                 output.onImageLoadFailed();
         }

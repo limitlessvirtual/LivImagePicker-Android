@@ -23,13 +23,13 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        imagePicker = new ImagePicker(this,
+        imagePicker = new ImagePicker(this,"Image Test",
                 new OutputBitmap() {
                     @Override
                     public void onImageLoaded(Uri uri, Bitmap image) {
                         bitmap = image;
+                        demo.setImageBitmap(image);
 
-                        demo.setImageURI(uri);
                     }
 
                     @Override
@@ -68,9 +68,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        if(savedInstanceState != null) {
+            demo.setImageBitmap((Bitmap) savedInstanceState.getParcelable("bitmap"));
+        }
+    }
+
+    @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
+        outState.putParcelable("bitmap",bitmap);
         imagePicker.onSavedInstanceState(outState);
     }
 }

@@ -14,13 +14,17 @@ import android.graphics.Paint;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Parcelable;
 import android.provider.MediaStore;
-import android.util.Log;
 
+import java.io.File;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * ImagePicker class used to wrap Activity Events and provide boilerplate code for image picker
@@ -55,6 +59,7 @@ public class ImagePicker {
     private boolean exact;
     private final Object lock = new Object();
     private static boolean isRunning = false;
+    private String galleryName;
 
     //Thread instance
     private DecodeUriAsync decodeUriAsync;
@@ -68,7 +73,7 @@ public class ImagePicker {
      * @param height  Maximum height of the image
      * @param exact   Flag to specify if the image must be exactly the width and height, if false then it will be at most the height and width but not exactly.
      */
-    public ImagePicker(Activity context, Output output, float width, float height, boolean exact) {
+    public ImagePicker(Activity context, String galleryName , Output output, float width, float height, boolean exact) {
 
         //Member setters
         this.context = context;
@@ -76,6 +81,7 @@ public class ImagePicker {
         this.height = height;
         this.output = output;
         this.exact = exact;
+        this.galleryName = galleryName;
     }
 
     /**
@@ -100,7 +106,7 @@ public class ImagePicker {
             isCamera = savedInstanceState.getBoolean("isCamera");
 
             //Decode saved Uri to provide Activity with a fresh instance of the Bitmap (after destruction)
-            if(outputFileUri != null && !isRunning) {
+            if(outputFileUri != null) {
                 decodeUriAsync = new DecodeUriAsync();
                 decodeUriAsync.execute(outputFileUri, width, height, isCamera);
             }
@@ -179,7 +185,7 @@ public class ImagePicker {
         ContentValues values = new ContentValues();
 
         if(newFileUri == null)
-            newFileUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            newFileUri = Uri.fromFile(getOutputMediaFile());
 
         //Ensure that uri was able to be created
         if(newFileUri == null)
@@ -264,7 +270,6 @@ public class ImagePicker {
 
                     //Retrieve parameters
                     Uri uri = (Uri) params[0];
-                    Log.i("URI", uri.toString());
                     float maxHeight = (float) params[1];
                     float maxWidth = (float) params[2];
                     boolean isCamera = (boolean) params[3];
@@ -393,9 +398,33 @@ public class ImagePicker {
             rotation += 90;
             if(!isRunning) {
                 decodeUriAsync = new DecodeUriAsync();
-                Log.i("URI", String.format("Trying rotation with %s", outputFileUri.toString()));
                 decodeUriAsync.execute(outputFileUri, width, height, isCamera);
             }
         }
+    }
+
+    /*
+     * returning image / video
+     */
+    private File getOutputMediaFile() {
+        // External sdcard location
+        File mediaStorageDir = new File(
+                Environment
+                        .getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                galleryName);
+
+        // Create the storage directory if it does not exist
+        if (!mediaStorageDir.exists()) {
+            if (!mediaStorageDir.mkdirs()) {
+                return null;
+            }
+        }
+
+        // Create a media file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",
+                Locale.getDefault()).format(new Date());
+
+        return new File(mediaStorageDir.getPath() + File.separator
+                + "IMG_" + timeStamp + ".jpg");
     }
 }

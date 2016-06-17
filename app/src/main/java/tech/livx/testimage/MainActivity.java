@@ -4,10 +4,12 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import tech.livx.livimagepicker.ImagePicker;
 import tech.livx.livimagepicker.OutputBitmap;
@@ -36,8 +38,13 @@ public class MainActivity extends AppCompatActivity {
                     public void onImageLoadFailed() {
                         Log.i("TEST","FAILED");
                     }
+
+                    @Override
+                    public void onPermissionsDenied() {
+                        Toast.makeText(MainActivity.this, "Permissions are denied", Toast.LENGTH_SHORT).show();
+                    }
                 },
-                300, 300, false);
+                800, 800, false);
 
         demo = (ImageView) findViewById(R.id.demo);
 
@@ -65,6 +72,13 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         imagePicker.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        imagePicker.onRequestPermissionsResult(requestCode,permissions,grantResults);
     }
 
     @Override

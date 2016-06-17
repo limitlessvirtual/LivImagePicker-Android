@@ -25,9 +25,11 @@ public class ExifUtil {
         Cursor cursor = context.getContentResolver().query(src,
                 new String[]{MediaStore.Images.ImageColumns.ORIENTATION}, null, null, null);
 
-        assert cursor != null;
+        if(cursor == null)
+            return 0;
+
         if (cursor.getCount() != 1 && cursor.getColumnCount() != 1) {
-            return -1;
+            return 0;
         }
 
         cursor.moveToFirst();

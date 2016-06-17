@@ -1,5 +1,6 @@
 package tech.livx.livimagepicker;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -17,6 +18,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Parcelable;
 import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
 
 import java.io.File;
 import java.io.InputStream;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
 
 /**
  * ImagePicker class used to wrap Activity Events and provide boilerplate code for image picker
@@ -39,7 +42,8 @@ public class ImagePicker {
     public static final int IMAGE_PICK_TYPE_CAMERA_AND_GALLERY = 2;
 
     //Random activity request code
-    private static final int ACTIVITY_REQUEST = 53642;
+    private static final int ACTIVITY_REQUEST = 536;
+    public static final int PERMISSION_REQUEST = 163;
 
     //Output uri of selected image
     private android.net.Uri outputFileUri;
@@ -60,6 +64,7 @@ public class ImagePicker {
     private final Object lock = new Object();
     private static boolean isRunning = false;
     private String galleryName;
+    private int imageType;
 
     //Thread instance
     private DecodeUriAsync decodeUriAsync;
@@ -68,12 +73,13 @@ public class ImagePicker {
      * Constructor
      *
      * @param context Activity reference
+     * @param galleryName Name of photo gallery
      * @param output  Output callback
      * @param width   Maximum width of the image
      * @param height  Maximum height of the image
      * @param exact   Flag to specify if the image must be exactly the width and height, if false then it will be at most the height and width but not exactly.
      */
-    public ImagePicker(Activity context, String galleryName , Output output, float width, float height, boolean exact) {
+    public ImagePicker(Activity context, String galleryName, Output output, float width, float height, boolean exact) {
 
         //Member setters
         this.context = context;
@@ -92,21 +98,22 @@ public class ImagePicker {
     public void onCreate(Bundle savedInstanceState) {
 
         if (savedInstanceState != null) {
-            if(savedInstanceState.getString("outputFileUri") == null)
+            if (savedInstanceState.getString("outputFileUri") == null)
                 outputFileUri = null;
             else
                 outputFileUri = Uri.parse(savedInstanceState.getString("outputFileUri"));
 
-            if(savedInstanceState.getString("newFileUri") == null)
+            if (savedInstanceState.getString("newFileUri") == null)
                 newFileUri = null;
             else
                 newFileUri = Uri.parse(savedInstanceState.getString("newFileUri"));
 
             rotation = savedInstanceState.getInt("rotation");
             isCamera = savedInstanceState.getBoolean("isCamera");
+            imageType = savedInstanceState.getInt("imageType");
 
             //Decode saved Uri to provide Activity with a fresh instance of the Bitmap (after destruction)
-            if(outputFileUri != null) {
+            if (outputFileUri != null) {
                 decodeUriAsync = new DecodeUriAsync();
                 decodeUriAsync.execute(outputFileUri, width, height, isCamera);
             }
@@ -125,23 +132,17 @@ public class ImagePicker {
         if (requestCode == ACTIVITY_REQUEST) {
             if (resultCode == Activity.RESULT_OK) {
 
-                if (data == null) {
-                    //Some camera apps give null data
+                if (data == null || data.getData() == null) {
                     isCamera = true;
-                } else {
-                    //Others give data containing the ACTION_IMAGE_CAPTURE
-                    final String action = data.getAction();
-                    isCamera = action != null && action.equals(MediaStore.ACTION_IMAGE_CAPTURE);
-                }
-
-                if (!isCamera)
-                    outputFileUri = data.getData();
-                else
                     outputFileUri = newFileUri;
+                } else {
+                    isCamera = false;
+                    outputFileUri = data.getData();
+                }
 
                 //Attempt to decode the returned Uri in a background thread.
                 try {
-                    if(!isRunning && outputFileUri != null) {
+                    if (!isRunning && outputFileUri != null) {
                         decodeUriAsync = new DecodeUriAsync();
                         decodeUriAsync.execute(outputFileUri, width, height, isCamera);
                     }
@@ -154,22 +155,48 @@ public class ImagePicker {
     }
 
     /**
+     * Wraps onRequestPermissionsResult to check permission requirements
+     *
+     * @param requestCode  permission ode
+     * @param permissions  permissions
+     * @param grantResults results
+     */
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == PERMISSION_REQUEST) {
+            boolean isAllowed = true;
+
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED)
+                    isAllowed = false;
+            }
+
+            if (isAllowed)
+                pickImage(imageType);
+            else {
+                if (output != null)
+                    output.onPermissionsDenied();
+            }
+        }
+    }
+
+    /**
      * Wraps activity event onSavedInstanceState to save stat variables.
      *
      * @param savedInstanceState Activity savedInstanceState bundle
      */
     public void onSavedInstanceState(Bundle savedInstanceState) {
-        if(outputFileUri == null)
+        if (outputFileUri == null)
             savedInstanceState.putString("outputFileUri", null);
         else
             savedInstanceState.putString("outputFileUri", outputFileUri.toString());
 
-        if(newFileUri == null)
+        if (newFileUri == null)
             savedInstanceState.putString("newFileUri", null);
         else
             savedInstanceState.putString("newFileUri", newFileUri.toString());
         savedInstanceState.putInt("rotation", rotation);
         savedInstanceState.putBoolean("isCamera", isCamera);
+        savedInstanceState.putInt("imageType", imageType);
     }
 
     /**
@@ -178,29 +205,41 @@ public class ImagePicker {
      * @param imagePickType Type of pick eg IMAGE_PICK_TYPE_CAMERA_ONLY
      */
     public void pickImage(int imagePickType) {
+
+        imageType = imagePickType;
+
+        //Check permissions
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(context,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA}, PERMISSION_REQUEST);
+
+            return;
+        }
+
         //reset variables
         rotation = 0;
 
         //Insert a URI into the gallery for our new captured image and hold onto it
         ContentValues values = new ContentValues();
 
-        if(newFileUri == null)
+        if (newFileUri == null)
             newFileUri = Uri.fromFile(getOutputMediaFile());
 
         //Ensure that uri was able to be created
-        if(newFileUri == null)
+        if (newFileUri == null)
             return;
 
         switch (imagePickType) {
-            case IMAGE_PICK_TYPE_CAMERA_AND_GALLERY : {
+            case IMAGE_PICK_TYPE_CAMERA_AND_GALLERY: {
                 context.startActivityForResult(createGalleryAndCameraIntent(newFileUri), ACTIVITY_REQUEST);
                 break;
             }
-            case IMAGE_PICK_TYPE_CAMERA_ONLY : {
+            case IMAGE_PICK_TYPE_CAMERA_ONLY: {
                 context.startActivityForResult(createCameraIntent(newFileUri), ACTIVITY_REQUEST);
                 break;
             }
-            case IMAGE_PICK_TYPE_GALLERY_ONLY : {
+            case IMAGE_PICK_TYPE_GALLERY_ONLY: {
                 context.startActivityForResult(createGalleryIntent(), ACTIVITY_REQUEST);
                 break;
             }
@@ -382,8 +421,8 @@ public class ImagePicker {
         @Override
         protected void onPostExecute(Bitmap bitmap) {
             isRunning = false;
-            if(bitmap != null)
-                output.process(outputFileUri,bitmap);
+            if (bitmap != null)
+                output.process(outputFileUri, bitmap);
             else
                 output.onImageLoadFailed();
         }
@@ -396,7 +435,7 @@ public class ImagePicker {
 
         if (outputFileUri != null) {
             rotation += 90;
-            if(!isRunning) {
+            if (!isRunning) {
                 decodeUriAsync = new DecodeUriAsync();
                 decodeUriAsync.execute(outputFileUri, width, height, isCamera);
             }

@@ -13,5 +13,7 @@ public interface Output<T> {
 
     void onImageLoadFailed();
 
+    void onPermissionsDenied();
+
     void process(Uri uri,Bitmap bitmap);
 }

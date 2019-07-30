@@ -4,12 +4,13 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 
 import tech.livx.livimagepicker.ImagePicker;
 import tech.livx.livimagepicker.OutputBitmap;
@@ -46,7 +47,7 @@ public class MainActivity extends AppCompatActivity {
                 },
                 800, 800, false);
 
-        demo = (ImageView) findViewById(R.id.demo);
+        demo = findViewById(R.id.demo);
 
         imagePicker.onCreate(savedInstanceState);
 
@@ -78,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        imagePicker.onRequestPermissionsResult(requestCode,permissions,grantResults);
+        imagePicker.onRequestPermissionsResult(requestCode, grantResults);
     }
 
     @Override
@@ -93,7 +94,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
-        outState.putParcelable("bitmap",bitmap);
         imagePicker.onSavedInstanceState(outState);
     }
 }

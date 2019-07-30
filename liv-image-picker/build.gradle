@@ -13,7 +13,7 @@ ext {
     siteUrl = 'https://github.com/limitlessvirtual/LivImagePicker-Android'
     gitUrl = 'https://github.com/limitlessvirtual/LivImagePicker-Android.git'
 
-    libraryVersion = '0.4.1'
+    libraryVersion = '0.5.0'
 
     developerId = 'mitchdart'
     developerName = 'Mitch Dart'
@@ -25,14 +25,14 @@ ext {
 }
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.2"
+    compileSdkVersion 28
+    buildToolsVersion "28.0.3"
 
     defaultConfig {
         minSdkVersion 14
-        targetSdkVersion 23
+        targetSdkVersion 28
         versionCode 15
-        versionName "0.4.1"
+        versionName "0.5.0"
     }
     buildTypes {
         release {
@@ -43,7 +43,8 @@ android {
 }
 
 dependencies {
-    compile 'com.android.support:support-v4:23.3.0'
+    api 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.exifinterface:exifinterface:1.1.0-beta01'
 }
 
 apply from: 'https://raw.githubusercontent.com/nuuneoi/JCenter/master/installv1.gradle'

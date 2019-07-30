@@ -2,7 +2,7 @@ package tech.livx.livimagepicker;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.media.ExifInterface;
+import androidx.exifinterface.media.ExifInterface;
 import android.net.Uri;
 import android.provider.MediaStore;
 
@@ -12,7 +12,7 @@ import android.provider.MediaStore;
  * @author Limitless Virtual
  * @version 0.1
  */
-public class ExifUtil {
+class ExifUtil {
 
     /**
      * Retrieve Exif from content provider
@@ -21,7 +21,7 @@ public class ExifUtil {
      * @param src     Selected image Uri
      * @return Orientation in degrees
      */
-    public static int getExifOrientationFromGallery(Context context, Uri src) {
+    static int getExifOrientationFromGallery(Context context, Uri src) {
         Cursor cursor = context.getContentResolver().query(src,
                 new String[]{MediaStore.Images.ImageColumns.ORIENTATION}, null, null, null);
 
@@ -46,15 +46,18 @@ public class ExifUtil {
      * @param src     Selected image Uri
      * @return orientation in degrees
      */
-    public static int getExifOrientationFromCamera(Context context, Uri src) {
+    static int getExifOrientationFromCamera(Context context, Uri src) {
         int rotate = 0;
         try {
+            String path = src.getPath();
 
-            context.getContentResolver().notifyChange(src, null);
-            ExifInterface exif = new ExifInterface(src.getPath());
+            if(path == null)
+                return rotate;
+
+            ExifInterface exif = new ExifInterface(path);
             int orientation = exif.getAttributeInt(
                     ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL);
+                    ExifInterface.ORIENTATION_UNDEFINED);
 
             switch (orientation) {
                 case ExifInterface.ORIENTATION_ROTATE_270:

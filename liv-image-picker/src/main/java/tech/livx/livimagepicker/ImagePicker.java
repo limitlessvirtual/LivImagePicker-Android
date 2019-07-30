@@ -3,7 +3,6 @@ package tech.livx.livimagepicker;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ComponentName;
-import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -18,7 +17,8 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Parcelable;
 import android.provider.MediaStore;
-import android.support.v4.app.ActivityCompat;
+
+import androidx.core.app.ActivityCompat;
 
 import java.io.File;
 import java.io.InputStream;
@@ -37,13 +37,13 @@ import java.util.Locale;
  */
 
 public class ImagePicker {
-    public static final int IMAGE_PICK_TYPE_CAMERA_ONLY = 0;
-    public static final int IMAGE_PICK_TYPE_GALLERY_ONLY = 1;
+    private static final int IMAGE_PICK_TYPE_CAMERA_ONLY = 0;
+    private static final int IMAGE_PICK_TYPE_GALLERY_ONLY = 1;
     public static final int IMAGE_PICK_TYPE_CAMERA_AND_GALLERY = 2;
 
     //Random activity request code
     private static final int ACTIVITY_REQUEST = 536;
-    public static final int PERMISSION_REQUEST = 163;
+    private static final int PERMISSION_REQUEST = 163;
 
     //Output uri of selected image
     private android.net.Uri outputFileUri;
@@ -158,10 +158,9 @@ public class ImagePicker {
      * Wraps onRequestPermissionsResult to check permission requirements
      *
      * @param requestCode  permission ode
-     * @param permissions  permissions
      * @param grantResults results
      */
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, int[] grantResults) {
         if (requestCode == PERMISSION_REQUEST) {
             boolean isAllowed = true;
 
@@ -221,7 +220,6 @@ public class ImagePicker {
         rotation = 0;
 
         //Insert a URI into the gallery for our new captured image and hold onto it
-        ContentValues values = new ContentValues();
 
         if (newFileUri == null)
             newFileUri = Uri.fromFile(getOutputMediaFile());
@@ -330,9 +328,7 @@ public class ImagePicker {
                     //Start off with a 1:1 ratio (Full size)
                     int scaleFactor = 1;
 
-                    while (true) {
-                        if (width / 2 < maxSize && height / 2 < maxSize)
-                            break;
+                    while (!(width / 2 < maxSize) || !(height / 2 < maxSize)) {
                         width /= 2;
                         height /= 2;
                         scaleFactor *= 2;
@@ -408,6 +404,7 @@ public class ImagePicker {
                     Canvas canvas = new Canvas(dest);
 
                     //Draw final bitmap
+                    assert finalBitmap != null;
                     canvas.drawBitmap(finalBitmap, matrix, new Paint());
                     finalBitmap.recycle();
                     return dest;
